@@ -1,0 +1,7 @@
+# Generated dashboards carry account value, positions and P&L.
+# The generator is versioned; its output never is.
+*.html
+out/
+.DS_Store
+__pycache__/
+rh-data.json
