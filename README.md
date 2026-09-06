@@ -60,3 +60,29 @@ prominently for that reason: it is the age of every figure on the page.
 - The regime bar's flex children are pinned `flex:none` — flex items shrink below
   an explicit width, which drew a 14/11 split as roughly 2/9.
 - `config.markets` in zillow-agent is a **list** of `{name, zips}`, not a dict.
+
+## Scheduled refresh
+
+`asset-dashboard-refresh` — weekdays 08:45 local. Pulls the Robinhood connector,
+runs the generator, republishes to the **same** Artifact URL so the bookmarked
+link never changes:
+
+```
+https://claude.ai/code/artifact/b21714f5-9074-43cd-bfba-51787c79e0bc
+```
+
+Two guardrails are written into the task prompt:
+
+- **Read-only on Robinhood.** It calls `get_portfolio`, `get_equity_positions` and
+  `get_equity_quotes` and nothing else. The standing rule is confirm-first on every
+  trade; this task has no authority to place one.
+- **It refuses to publish without live portfolio figures.** If the connector is
+  unavailable it reports the skip instead of shipping a page with stale money. A
+  missed update is recoverable; a dashboard showing wrong numbers is not.
+
+It also knows which alarming-looking states are deliberate — the muted Kalshi
+channels (health check reads DEGRADED by design) and the $0 Agentic account — so
+it does not "fix" them or flag them every morning.
+
+Scheduled tasks run while the desktop app is open; if it is closed at 08:45 the
+run happens at next launch.
