@@ -73,6 +73,23 @@ if isinstance(zmk, dict):
 zmk = [m for m in zmk if isinstance(m, dict)]
 zzips = sum(len(m.get("zips", [])) for m in zmk)
 
+# ---------- 3b. scheduled work ----------
+# launchd agents are verified live. Claude scheduled tasks cannot be — their
+# cron is held by the app, not on disk — so the config carries their schedule
+# and we cross-check the task directories to surface anything unrecorded.
+AGENTS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agents.json")
+agents_cfg = jload(AGENTS_FILE, {})
+TASK_DIR = os.path.join(HOME, ".claude", "scheduled-tasks")
+known_tasks = ({t["id"] for t in agents_cfg.get("claude_tasks", [])}
+               | set(agents_cfg.get("retired", [])))
+on_disk = set()
+try:
+    on_disk = {d for d in os.listdir(TASK_DIR)
+               if os.path.isfile(os.path.join(TASK_DIR, d, "SKILL.md"))}
+except Exception:
+    pass
+unknown_tasks = sorted(on_disk - known_tasks)
+
 # ---------- 4. launchd ----------
 try:
     ll = subprocess.run(["/bin/launchctl", "list"], capture_output=True, text=True, timeout=10).stdout
@@ -89,6 +106,19 @@ ag_flip   = agent("com.dhruv.flipnotifier")
 ag_awake  = agent("com.dhruv.flipnotifier.awake")
 ag_kalshi = agent("com.dhruv.kalshiwatcher")
 ag_zillow = agent("com.dhruv.zillowagent")
+
+def agent_rows():
+    out = []
+    for a in agents_cfg.get("launchd", []):
+        st = agent(a["label"])
+        out.append((a["what"], a["every"], "ok" if st["loaded"] and st["exit"] == "0"
+                    else ("bad" if not st["loaded"] else "warn"),
+                    "loaded" if st["loaded"] else "NOT LOADED"))
+    for t in agents_cfg.get("claude_tasks", []):
+        present = t["id"] in on_disk
+        out.append((t["what"], t["every"], "acc" if present else "bad",
+                    "scheduled task" if present else "MISSING"))
+    return out
 
 # ---------- 5. Robinhood (from connector) ----------
 RH = json.loads(os.environ["RH_DATA"])
@@ -288,6 +318,10 @@ ul.tks {{ list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; ga
 .tk.pos {{ background:var(--pos-soft); color:var(--pos); }}
 .tk.neg {{ background:var(--neg-soft); color:var(--neg); }}
 
+.agrid {{ display:grid; grid-template-columns:1fr auto auto; gap:6px 12px; align-items:center; }}
+.agrid .n {{ font-size:13.5px; }}
+.agrid .w {{ font-family:"JetBrains Mono",monospace; font-size:11.5px; color:var(--muted);
+            font-variant-numeric:tabular-nums; text-align:right; }}
 .volrow {{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }}
 .volnum {{ font-family:"JetBrains Mono",monospace; font-weight:700; font-size:26px;
           font-variant-numeric:tabular-nums; letter-spacing:-.02em; line-height:1; }}
@@ -501,6 +535,36 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
       <div>
         <div class="lbl">Delayed feeds · CME add-on not held</div>
         <ul class="tks">{''.join(f'<li class="tk warn">{e(s)}</li>' for s in ["MNQ1!","MES1!","MYM1!","MGC1!","MCL1!"])}</ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5 &#9472; Scheduled work -->
+  <div class="card">
+    <div class="stripe {'bad' if unknown_tasks else 'ok'}"></div>
+    <div class="head">
+      <h2>Scheduled work</h2>
+      {chip(f"{len(agents_cfg.get('launchd', []))} agents", 'acc')}
+      {chip(f"{len(agents_cfg.get('claude_tasks', []))} tasks", 'acc')}
+      <span class="sid">launchd + claude</span>
+    </div>
+    <div class="body">
+      <div class="agrid">
+        {''.join(
+          f'<span class="n">{e(w)}</span>'
+          f'<span class="w">{e(ev)}</span>'
+          f'{chip(lbl, kind)}'
+          for w, ev, kind, lbl in agent_rows())}
+      </div>
+      {'' if not unknown_tasks else
+       '<div class="note bad"><span>&#9679;</span><span><b>Unrecorded scheduled task(s):</b> '
+       + e(', '.join(unknown_tasks))
+       + '. They run but are not described in <code>agents.json</code>, so this card cannot say what they do.</span></div>'}
+      <div class="note">
+        <span>&#8505;</span><span>launchd agents are checked live against
+        <code>launchctl</code>. Claude task schedules live in the app rather than on disk,
+        so they are recorded in <code>agents.json</code> &#8212; the card cross-checks the task
+        directory and flags anything it does not recognise rather than quietly omitting it.</span>
       </div>
     </div>
   </div>
