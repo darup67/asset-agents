@@ -138,8 +138,7 @@ elif _ag < 100:
     agentic_note = (
         '<div class="note bad"><span>&#9679;</span><span>The <b>Agentic account '
         '(&#8226;&#8226;4526)</b> &#8212; the only one this connector can trade &#8212; holds '
-        '<b>' + money(_ag, 2) + '</b>, so <code>3x-etf-daily-directional</code> has no '
-        'capital to deploy.</span></div>')
+        '<b>' + money(_ag, 2) + '</b> &#8212; nothing to deploy.</span></div>')
 else:
     agentic_note = (
         '<div class="note"><span>&#8505;</span><span>Agentic account '
