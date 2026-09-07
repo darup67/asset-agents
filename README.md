@@ -113,6 +113,31 @@ Two labels are derived, not hardcoded, so they cannot go stale:
 (which counted `ALERTED` lines that BTC-only mode no longer emits, so it would
 have sat frozen) is now the live vol reading.
 
+## All accounts, not just the main one
+
+The RH card originally showed only `••7521` because that is the account with
+positions worth discussing. It was understating the picture by **$26,455** —
+about 12% — because two funded accounts were simply absent:
+
+| Account | Value | Holds |
+|---|---|---|
+| ••7521 Individual · margin · opt L3 | $188,965 | 16 equities + crypto + futures |
+| **••4780 Cash · individual** | **$25,363** | JEPQ 419 sh |
+| **••3557 Roth IRA · managed** | **$1,092** | equities |
+| ••7346 Individual · managed | $0.07 | cash only |
+| ••8775 Roth IRA · self-directed | $0.02 | empty |
+| ••9814 Traditional IRA | $0.00 | empty |
+| ••4526 Agentic · connector-tradable | $0.00 | empty |
+| **All** | **$215,421** | |
+
+Empty accounts are listed rather than hidden — an account that quietly went to
+zero is worth seeing, which is how the Agentic balance going to $0 was noticed
+in the first place.
+
+Positions from more than one account now carry the account they sit in, and the
+label says how many accounts are represented. Merging two accounts into one
+unlabelled table is the kind of quiet aggregation that misleads later.
+
 ## Scheduled work card
 
 A fifth card lists every scheduled thing in the stack — seven launchd agents and

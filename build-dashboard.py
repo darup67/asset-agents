@@ -161,6 +161,9 @@ e = html.escape
 # Only surface the Agentic account when it cannot fund the strategy that
 # depends on it. Deriving this from the balance means the card can never
 # contradict the broker the way the previous hardcoded figure did.
+ACCOUNTS = RH.get("accounts", [])
+all_total = sum(a.get("total", 0) for a in ACCOUNTS) if ACCOUNTS else RH.get("total", 0)
+
 _ag = RH.get("agentic")
 if _ag is None:
     agentic_note = ""
@@ -174,6 +177,15 @@ else:
         '<div class="note"><span>&#8505;</span><span>Agentic account '
         '(&#8226;&#8226;4526) holds <b>' + money(_ag) + '</b> &#8212; the only account this '
         'connector can place orders in.</span></div>')
+
+# Sorted by value so the accounts that matter lead. Empty ones are still listed
+# rather than hidden — an account that quietly went to zero is worth seeing.
+acct_rows = "".join(
+    f'<tr><td class="sym">{e(a["name"])}</td>'
+    f'<td class="num" style="text-align:left;font-size:11.5px">{e(a.get("kind",""))}</td>'
+    f'<td class="num">{money(a.get("total",0), 2 if a.get("total",0) < 1000 else 0)}</td>'
+    f'<td class="num" style="text-align:left;font-size:11.5px">{e(a.get("holds",""))}</td></tr>'
+    for a in sorted(ACCOUNTS, key=lambda x: -x.get("total", 0)))
 
 def volbars(wins):
     """Four windows as bars on a fixed 0-100c scale, with the LOW/HIGH cuts
@@ -205,7 +217,10 @@ rows_sell = "".join(f'<li class="tk neg">{e(s)}</li>' for s in sells)
 kser = "".join(f'<li class="tk">{e(s["ticker"])}</li>' for s in kseries)
 
 posrows = "".join(
-    f'<tr><td class="sym">{e(p["sym"])}</td>'
+    f'<tr><td class="sym">{e(p["sym"])}'
+    + (f'<span style="color:var(--faint);font-weight:400;font-size:10.5px"> {e(p["acct"])}</span>'
+       if p.get("acct") else "")
+    + '</td>'
     f'<td class="num">{p["q"]:,.2f}</td>'
     f'<td class="num">{money(p["val"])}</td>'
     f'<td class="num {"pos" if p["pl"]>=0 else "neg"}">{signed(p["pl"])}</td>'
@@ -453,7 +468,7 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
     </div>
     <div class="body">
       <div class="kv">
-        <div><span class="k">Account value</span><span class="v">{money(RH["total"])}</span></div>
+        <div><span class="k">All accounts</span><span class="v">{money(all_total)}</span></div>
         <div><span class="k">Equities</span><span class="v">{money(RH["equity"])}</span></div>
         <div><span class="k">Crypto</span><span class="v">{money(RH["crypto"])}</span></div>
         <div><span class="k">Cash</span><span class="v">{money(RH["cash"])}</span></div>
@@ -463,10 +478,22 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
           <span class="v {'pos' if RH['futures']>=0 else 'neg'}">{signed(RH['futures'])}</span></div>
       </div>
 
+      <div>
+        <div class="lbl">Accounts &#183; {len(ACCOUNTS)} total</div>
+        <div class="tblwrap">
+          <table>
+            <thead><tr><th>Account</th><th>Type</th><th>Value</th><th>Holds</th></tr></thead>
+            <tbody>{acct_rows}</tbody>
+            <tfoot><tr><td class="sym">ALL</td><td class="num"></td>
+              <td class="num">{money(all_total)}</td><td class="num"></td></tr></tfoot>
+          </table>
+        </div>
+      </div>
+
       {agentic_note}
 
       <div>
-        <div class="lbl">Positions · {len(pos)} held · {EQ_ASOF}</div>
+        <div class="lbl">Positions · {len(pos)} held across {len(set(p.get("acct","") for p in pos))} account(s) · {EQ_ASOF}</div>
         <div class="tblwrap">
           <table>
             <thead><tr><th>Symbol</th><th>Qty</th><th>Value</th><th>P&amp;L</th><th>%</th></tr></thead>
