@@ -1,4 +1,4 @@
-# Asset Agents
+# Asset Agents Dashboard
 
 The cross-agent layer over four pinned Claude Code sessions on this Mac. Each
 agent owns its own repo and runs independently; this one only *observes* them
