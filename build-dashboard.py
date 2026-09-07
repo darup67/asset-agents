@@ -81,6 +81,21 @@ ag_zillow = agent("com.dhruv.zillowagent")
 
 # ---------- 5. Robinhood (from connector) ----------
 RH = json.loads(os.environ["RH_DATA"])
+
+# Equity prices carry their own asof date; derive the label from it instead of
+# hardcoding "Friday close". On Labor Day the last print is still Friday's, and
+# a dashboard that says "live" on a shut market is worse than one that says
+# nothing. asof is an ISO date from the quote timestamps.
+_asof = RH.get("asof")
+if _asof:
+    _d = datetime.datetime.fromisoformat(_asof).date()
+    _today = now.date()
+    _stale_days = (_today - _d).days
+    EQ_ASOF = ("live" if _stale_days == 0 and now.hour < 16
+               else f"{_d.strftime('%a %-d %b')} close")
+    EQ_OPEN = (_stale_days == 0)
+else:
+    EQ_ASOF, EQ_OPEN = "last close", False
 pos = []
 for p in RH["positions"]:
     q, av, last = p["q"], p["avg"], p["last"]
@@ -324,7 +339,7 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
     <div class="stripe {'ok' if tot_pl >= 0 else 'bad'}"></div>
     <div class="head">
       <h2>RH</h2>
-      {chip('market closed', 'warn')}
+      {chip('equities ' + EQ_ASOF, 'ok' if EQ_OPEN else 'warn')}
       {chip('confirm-first', 'acc')}
       <span class="sid">robinhood</span>
     </div>
@@ -347,7 +362,7 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
       </div>
 
       <div>
-        <div class="lbl">Positions · {len(pos)} held, Friday close</div>
+        <div class="lbl">Positions · {len(pos)} held · {EQ_ASOF}</div>
         <div class="tblwrap">
           <table>
             <thead><tr><th>Symbol</th><th>Qty</th><th>Value</th><th>P&amp;L</th><th>%</th></tr></thead>
@@ -421,9 +436,9 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
   </div>
 
   <footer>
-    Built from local state by <code>build-dashboard.py</code>. Robinhood figures come from
-    the connector and are Friday's close — the market is shut. Re-run the script to refresh
-    the watcher panels; the RH panel needs a new connector pull.
+    Built from local state by <code>build-dashboard.py</code>. Equity prices are
+    {EQ_ASOF}; crypto and futures trade around the clock and are current. Re-run the
+    script to refresh the watcher panels; the RH panel needs a new connector pull.
   </footer>
 </div>
 """
