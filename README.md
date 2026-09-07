@@ -113,6 +113,23 @@ Two labels are derived, not hardcoded, so they cannot go stale:
 (which counted `ALERTED` lines that BTC-only mode no longer emits, so it would
 have sat frozen) is now the live vol reading.
 
+## Scheduled work card
+
+A fifth card lists every scheduled thing in the stack — seven launchd agents and
+four Claude tasks, including `portfolio-weekly-review`.
+
+The two halves are verified differently, and the card says so rather than
+implying equal confidence:
+
+- **launchd agents** are checked live against `launchctl` — loaded or not.
+- **Claude task schedules live in the app, not on disk**, so they are recorded in
+  `agents.json`. The card cross-checks the task directory and flags anything it
+  does not recognise, so a task added later shows up instead of silently missing.
+
+That drift check first fired on all 14 historical disabled tasks, which is
+exactly the permanent warning people learn to ignore. They are now listed under
+`retired`, so only a genuinely new task surfaces.
+
 ## No remembered balances
 
 The Agentic-account note is derived from the balance passed in `RH_DATA`, not

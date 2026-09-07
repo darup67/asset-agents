@@ -1,0 +1,79 @@
+{
+  "_comment": "Scheduled work across the stack. launchd agents are verified live against launchctl; Claude scheduled tasks cannot be \u2014 their cron lives in the app, not on disk \u2014 so their schedule is recorded here and the generator flags any task directory it does not recognise.",
+  "launchd": [
+    {
+      "label": "com.dhruv.flipnotifier",
+      "what": "Flip notifier",
+      "every": "60s"
+    },
+    {
+      "label": "com.dhruv.flipnotifier.awake",
+      "what": "Sleep guard",
+      "every": "always"
+    },
+    {
+      "label": "com.dhruv.kalshiwatcher",
+      "what": "Kalshi watcher",
+      "every": "5m"
+    },
+    {
+      "label": "com.dhruv.zillowagent",
+      "what": "Zillow digest",
+      "every": "daily 7:30am"
+    },
+    {
+      "label": "com.dhruv.marketlab",
+      "what": "Kalshi recorder",
+      "every": "10m"
+    },
+    {
+      "label": "com.dhruv.marketlab.futures",
+      "what": "Futures recorder",
+      "every": "30m"
+    },
+    {
+      "label": "com.dhruv.marketlab.report",
+      "what": "Lab report email",
+      "every": "daily 7am"
+    }
+  ],
+  "claude_tasks": [
+    {
+      "id": "flip-watchlist-sync",
+      "what": "Sync Scanner to watchlist",
+      "every": "weekdays 8:33am"
+    },
+    {
+      "id": "flip-watcher-daily-health",
+      "what": "Flip watcher health",
+      "every": "weekdays 8:38am"
+    },
+    {
+      "id": "asset-dashboard-refresh",
+      "what": "Rebuild this dashboard",
+      "every": "weekdays 8:48am"
+    },
+    {
+      "id": "portfolio-weekly-review",
+      "what": "Robinhood portfolio review",
+      "every": "Sundays 9am"
+    }
+  ],
+  "_retired_comment": "Historical tasks that exist on disk but are disabled. Listed so the drift check stays useful: without them it flagged all 14 every build, which is exactly the kind of permanent warning people learn to ignore. A genuinely new task still surfaces.",
+  "retired": [
+    "3x-etf-daily-directional",
+    "covered-call-roll-monitor",
+    "earnings-aftermath",
+    "fomc-prebrief",
+    "fomc-report",
+    "nvda-bull-call-spread-check",
+    "odte-arc-orders-june25",
+    "options-volume-sweep",
+    "prebell-card-0915",
+    "premarket-brief",
+    "premarket-card-0700",
+    "qqq-715-alert",
+    "spcx-monitor",
+    "tjl-scanner"
+  ]
+}
