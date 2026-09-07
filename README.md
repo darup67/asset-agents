@@ -112,3 +112,13 @@ Two labels are derived, not hardcoded, so they cannot go stale:
 `kalshi: btc only` reflects `signals_paused`, and the old "Kalshi 24h" tile
 (which counted `ALERTED` lines that BTC-only mode no longer emits, so it would
 have sat frozen) is now the live vol reading.
+
+## No remembered balances
+
+The Agentic-account note is derived from the balance passed in `RH_DATA`, not
+written into the template. It previously read "~$7k" — a figure that was true
+when typed, went to $0, and then sat wrong on the dashboard and in memory until
+someone checked it against the broker.
+
+Anything that can drift gets derived or dropped. Same reason the equity as-of
+label reads the quote timestamps and the Kalshi chip reads `signals_paused`.
