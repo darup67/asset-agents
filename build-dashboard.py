@@ -128,6 +128,24 @@ def pct(v):
 e = html.escape
 
 # ---------- cards ----------
+# Only surface the Agentic account when it cannot fund the strategy that
+# depends on it. Deriving this from the balance means the card can never
+# contradict the broker the way the previous hardcoded figure did.
+_ag = RH.get("agentic")
+if _ag is None:
+    agentic_note = ""
+elif _ag < 100:
+    agentic_note = (
+        '<div class="note bad"><span>&#9679;</span><span>The <b>Agentic account '
+        '(&#8226;&#8226;4526)</b> &#8212; the only one this connector can trade &#8212; holds '
+        '<b>' + money(_ag, 2) + '</b>, so <code>3x-etf-daily-directional</code> has no '
+        'capital to deploy.</span></div>')
+else:
+    agentic_note = (
+        '<div class="note"><span>&#8505;</span><span>Agentic account '
+        '(&#8226;&#8226;4526) holds <b>' + money(_ag) + '</b> &#8212; the only account this '
+        'connector can place orders in.</span></div>')
+
 def volbars(wins):
     """Four windows as bars on a fixed 0-100c scale, with the LOW/HIGH cuts
     drawn as reference lines. A fixed scale matters: auto-scaling would make a
@@ -412,11 +430,7 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
           <span class="v {'pos' if RH['futures']>=0 else 'neg'}">{signed(RH['futures'])}</span></div>
       </div>
 
-      <div class="note bad">
-        <span>●</span><span>The <b>Agentic account (••4526)</b> — the only one this
-        connector can trade — is at <b>$0</b>. Notes still describe it as ~$7k, so the
-        <code>3x-etf-daily-directional</code> strategy has no capital to deploy.</span>
-      </div>
+      {agentic_note}
 
       <div>
         <div class="lbl">Positions · {len(pos)} held · {EQ_ASOF}</div>
