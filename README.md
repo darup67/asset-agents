@@ -86,3 +86,29 @@ it does not "fix" them or flag them every morning.
 
 Scheduled tasks run while the desktop app is open; if it is closed at 08:45 the
 run happens at next launch.
+
+## BTC volatility on the dashboard
+
+The Bitcoin 15-minute volatility index appears inside the **Flip Watcher v1**
+card, because that is the session the Kalshi watcher runs from — and it is now
+the only thing Kalshi alerts on.
+
+It renders as the index value, a band chip, and the four 15-minute windows the
+index averaged, drawn as bars on a **fixed 0–100¢ scale** with the LOW (28¢) and
+HIGH (52¢) cuts as reference lines.
+
+The fixed scale is deliberate. Auto-scaling would make a calm hour and a violent
+one look identical, which is the one thing this block exists to distinguish. The
+reference lines are positioned in pixels off the bar track rather than as a
+percentage of the container — the bars occupy 48px inside a 64px box, so a
+percentage pointed at the wrong height and the lines did not sit on the scale
+they label.
+
+Showing the components matters as much as the average: `47c 7c 84c 7c` reads
+"one violent window inside a calm hour", which a lone `36c NORMAL` hides
+completely.
+
+Two labels are derived, not hardcoded, so they cannot go stale:
+`kalshi: btc only` reflects `signals_paused`, and the old "Kalshi 24h" tile
+(which counted `ALERTED` lines that BTC-only mode no longer emits, so it would
+have sat frozen) is now the live vol reading.

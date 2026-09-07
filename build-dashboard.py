@@ -50,6 +50,17 @@ kw  = jload(os.path.join(FN, "kalshi-watchlist.json"))
 kal = kw.get("alerts", {})
 muted = [k for k, v in kal.items() if not v]
 kseries = kw.get("series", [])
+btc_only = bool(kw.get("signals_paused"))
+vol_live = any((kw.get("volAlerts") or {}).values()) if kw.get("volAlerts") else True
+
+# BTC 15m volatility index. volCache is keyed by window ticker (…-26SEP071015),
+# and those sort chronologically, so sorting the keys orders the windows.
+vol_index = ks.get("volIndex")
+vol_band  = ks.get("volBand")
+vol_wins  = [ks["volCache"][k] for k in sorted(ks.get("volCache", {}))] if ks.get("volCache") else []
+VOL_LOW, VOL_HIGH = 28, 52
+vol_kind = {"LOW": "ok", "HIGH": "bad"}.get(vol_band or "", "")
+vol_dot  = {"LOW": "\u25cf", "NORMAL": "\u25cf", "HIGH": "\u25cf"}.get(vol_band or "", "\u25cf")
 
 # ---------- 3. Zillow ----------
 zs  = jload(os.path.join(ZA, "state.json"))
@@ -117,6 +128,23 @@ def pct(v):
 e = html.escape
 
 # ---------- cards ----------
+def volbars(wins):
+    """Four windows as bars on a fixed 0-100c scale, with the LOW/HIGH cuts
+    drawn as reference lines. A fixed scale matters: auto-scaling would make a
+    calm hour and a violent one look identical."""
+    if not wins: return ""
+    cells = []
+    for w in wins:
+        pctv = max(2.0, min(100.0, w)) 
+        cls = "lo" if w < VOL_LOW else ("hi" if w > VOL_HIGH else "mid")
+        cells.append(
+            f'<div class="vb"><div class="vbt"><i class="{cls}" style="height:{pctv:.0f}%"></i></div>'
+            f'<span>{w:.0f}c</span></div>')
+    return ('<div class="vbars">'
+            f'<div class="vbrule" style="bottom:{16 + VOL_LOW * 0.48:.1f}px"><span>{VOL_LOW}</span></div>'
+            f'<div class="vbrule" style="bottom:{16 + VOL_HIGH * 0.48:.1f}px"><span>{VOL_HIGH}</span></div>'
+            + "".join(cells) + '</div>')
+
 def chip(txt, kind):
     return f'<span class="chip {kind}">{e(txt)}</span>'
 
@@ -243,6 +271,25 @@ ul.tks {{ list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; ga
 .tk.pos {{ background:var(--pos-soft); color:var(--pos); }}
 .tk.neg {{ background:var(--neg-soft); color:var(--neg); }}
 
+.volrow {{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }}
+.volnum {{ font-family:"JetBrains Mono",monospace; font-weight:700; font-size:26px;
+          font-variant-numeric:tabular-nums; letter-spacing:-.02em; line-height:1; }}
+.volnum small {{ font-size:14px; font-weight:500; color:var(--muted); }}
+.vbars {{ position:relative; display:flex; align-items:flex-end; gap:7px; height:64px;
+         padding:0 26px 0 4px; }}
+.vb {{ display:flex; flex-direction:column; align-items:center; gap:3px; width:30px; }}
+.vbt {{ width:100%; height:48px; display:flex; align-items:flex-end;
+       background:var(--sunk); border-radius:3px; overflow:hidden; }}
+.vbt i {{ display:block; width:100%; border-radius:3px 3px 0 0; }}
+.vbt i.lo {{ background:var(--pos); }}
+.vbt i.mid {{ background:var(--accent); }}
+.vbt i.hi {{ background:var(--neg); }}
+.vb span {{ font-family:"JetBrains Mono",monospace; font-size:10px; color:var(--faint);
+           font-variant-numeric:tabular-nums; }}
+.vbrule {{ position:absolute; left:4px; right:26px; height:1px; background:var(--line);
+          pointer-events:none; }}
+.vbrule span {{ position:absolute; right:-24px; top:-7px; font-family:"JetBrains Mono",monospace;
+               font-size:9px; color:var(--faint); }}
 .lbl {{ font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--faint);
        font-weight:600; margin-bottom:5px; }}
 
@@ -302,7 +349,8 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
     <div class="head">
       <h2>Flip Watcher v1</h2>
       {chip('healthy' if flip_ok else 'check', 'ok' if flip_ok else 'bad')}
-      {chip('kalshi silent', 'warn') if len(muted) == 4 else chip('kalshi alerting', 'ok')}
+      {chip('kalshi: btc only', 'acc') if btc_only and vol_live
+        else (chip('kalshi silent', 'warn') if len(muted) == 4 else chip('kalshi alerting', 'ok'))}
       <span class="sid">this session</span>
     </div>
     <div class="body">
@@ -310,7 +358,7 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
         <div><span class="k">Symbols</span><span class="v">{len(reg)}</span></div>
         <div><span class="k">Last poll</span><span class="v">{e(age(fs.get("updated")))}</span></div>
         <div><span class="k">Flips 24h</span><span class="v">{count(os.path.join(FN,'flip-notifier.log'),'NOTIFIED')}</span></div>
-        <div><span class="k">Kalshi 24h</span><span class="v">{count(os.path.join(FN,'kalshi-watcher.log'),'ALERTED')}</span></div>
+        <div><span class="k">BTC 15m vol</span><span class="v {vol_kind}">{(f"{vol_index:.0f}c " + vol_band) if vol_index is not None else "--"}</span></div>
       </div>
 
       <div>
@@ -323,11 +371,20 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
       <div><div class="lbl">Buy</div><ul class="tks">{rows_buy}</ul></div>
       <div><div class="lbl">Sell</div><ul class="tks">{rows_sell}</ul></div>
 
+      <div>
+        <div class="lbl">BTC 15m volatility &#183; reported every 30 min</div>
+        <div class="volrow">
+          <span class="volnum {vol_kind}">{f"{vol_index:.0f}" if vol_index is not None else "--"}<small>c</small></span>
+          {chip(vol_band or 'no reading yet', vol_kind)}
+          {volbars(vol_wins)}
+        </div>
+      </div>
+
       <div class="note">
-        <span>⚠</span><span><b>Every Kalshi alert channel is muted</b> — banner, sound,
-        speech and email. Signals still accumulate in <code>kalshi-alerts.tsv</code>
-        ({count(os.path.join(FN,'kalshi-watcher.log'),'ALERTED')} in 24h) but nothing announces them.
-        The health check reports DEGRADED for this by design.</span>
+        <span>&#9679;</span><span><b>Kalshi is in BTC-only mode.</b> FLIP/MOVE/VOLUME signals on the
+        other 12 series are paused; the Bitcoin volatility index is the only thing that alerts,
+        and it reaches banner, sound, speech and email. Set <code>signals_paused: false</code>
+        to bring the rest back.</span>
       </div>
 
       <div><div class="lbl">Kalshi series</div><ul class="tks">{kser}</ul></div>
