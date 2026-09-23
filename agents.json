@@ -35,6 +35,16 @@
       "label": "com.dhruv.marketlab.report",
       "what": "Lab report email",
       "every": "daily 7am"
+    },
+    {
+      "label": "com.dhruv.kalshibtc",
+      "what": "BTC 15m cushion caller",
+      "every": "60s"
+    },
+    {
+      "label": "com.dhruv.kalshibtc.recal",
+      "what": "BTC caller recalibration",
+      "every": "Sundays 6am"
     }
   ],
   "claude_tasks": [
