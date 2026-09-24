@@ -120,6 +120,23 @@ def agent_rows():
                     "scheduled task" if present else "MISSING"))
     return out
 
+# ---------- 4b. BTC 15m cushion caller ----------
+KB = os.path.join(HOME, "kalshi-btc-agent")
+kb_cfg  = jload(os.path.join(KB, "config.json"))
+kb_gate = jload(os.path.join(KB, "gate.json"))
+kb_rows = []
+try:
+    with open(os.path.join(KB, "data", "evals.jsonl")) as f:
+        kb_rows = [json.loads(l) for l in f.readlines()[-3000:] if l.strip()]
+except Exception:
+    pass
+_today_et = now.astimezone(datetime.timezone(datetime.timedelta(hours=-4))).date()
+def _et_day(t):
+    return datetime.datetime.fromtimestamp(t, datetime.timezone(datetime.timedelta(hours=-4))).date()
+kb_last = next((r for r in reversed(kb_rows) if r.get("status") in ("call", "no_call")), None)
+kb_calls_today = {r["ticker"] for r in kb_rows if r.get("status") == "call" and _et_day(r["t"]) == _today_et}
+kb_settled = [r for r in kb_rows if r.get("status") == "settled"]
+kb_won = sum(1 for r in kb_settled if r.get("won"))
 # ---------- 5. Robinhood (from connector) ----------
 RH = json.loads(os.environ["RH_DATA"])
 
@@ -158,6 +175,60 @@ def pct(v):
 e = html.escape
 
 # ---------- cards ----------
+if not btc_only:
+    kalshi_note = ""
+elif vol_live:
+    kalshi_note = ('<div class="note"><span>&#9679;</span><span><b>Kalshi is in BTC-only mode.</b> '
+                   'FLIP/MOVE/VOLUME signals on the other 12 series are paused; the Bitcoin volatility '
+                   'index is the only watcher alert still live. Set <code>signals_paused: false</code> '
+                   'to bring the rest back.</span></div>')
+else:
+    kalshi_note = ('<div class="note"><span>&#9679;</span><span><b>Kalshi watcher alerts are all muted.</b> '
+                   'Signals on all 13 series are paused and the BTC volatility-index alert is off; BTC 15m '
+                   'calls come from the cushion caller below. The health check&#8217;s DEGRADED is expected.</span></div>')
+
+def _btc_card():
+    if not kb_gate:
+        return ""
+    mc = kb_cfg.get("min_conf_override") or kb_gate.get("min_conf")
+    al = kb_cfg.get("alerts", {})
+    chans = " + ".join(k for k in ("banner", "sound", "speak", "email") if al.get(k)) or "none"
+    if kb_last:
+        age = int((now.timestamp() - kb_last["t"]) / 60)
+        if kb_last["status"] == "call":
+            last_txt = (f"{kb_last['side']} {kb_last.get('hist_hit', 0):.0%} &#183; "
+                        f"${abs(kb_last.get('gap', 0)):,.0f} cushion &#183; ask {kb_last.get('ask', 0) * 100:.0f}&#162;")
+        else:
+            last_txt = "NO CALL"
+        last_kind = "ok" if age <= 3 else "bad"
+        last_html = f'<span class="v">{last_txt}</span>'
+        age_html = chip(f"{age}m ago", last_kind)
+    else:
+        last_html, age_html = '<span class="v">--</span>', chip("no evaluations yet", "bad")
+    rec = f"{kb_won}/{len(kb_settled)}" if kb_settled else "--"
+    return f"""<!-- 1b ─ BTC 15m cushion caller -->
+  <div class="card">
+    <div class="stripe {'ok' if kb_last and (now.timestamp() - kb_last['t']) < 180 else 'bad'}"></div>
+    <div class="head">
+      <h2>BTC 15m cushion caller</h2>
+      {age_html}
+      {chip('read-only', 'acc')}
+      <span class="sid">~/kalshi-btc-agent</span>
+    </div>
+    <div class="body">
+      <div class="kv">
+        <div><span class="k">Latest</span>{last_html}</div>
+        <div><span class="k">Calls today</span><span class="v">{len(kb_calls_today)}</span></div>
+        <div><span class="k">Settled won</span><span class="v">{rec}</span></div>
+        <div><span class="k">Gate</span><span class="v">{mc:.0%} conf</span></div>
+        <div><span class="k">Alerts</span><span class="v" style="font-size:12px">{chans}</span></div>
+      </div>
+      <div class="note"><span>&#8505;</span><span>Calls a Kalshi KXBTC15M window only when the gap to the
+      strike is large against the volatility left. Backtest: calls are accurate but <b>priced in</b>
+      &#8212; win rate matches the ask at every confidence level, roughly zero after fees.</span></div>
+    </div>
+  </div>"""
+
 # Only surface the Agentic account when it cannot fund the strategy that
 # depends on it. Deriving this from the balance means the card can never
 # contradict the broker the way the previous hardcoded figure did.
@@ -206,6 +277,8 @@ def volbars(wins):
 
 def chip(txt, kind):
     return f'<span class="chip {kind}">{e(txt)}</span>'
+
+btc_card = _btc_card()
 
 flip_ok   = ag_flip["loaded"] and fs.get("failures", 0) == 0
 kalshi_ok = ag_kalshi["loaded"] and ks.get("failures", 0) == 0
@@ -446,16 +519,13 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
         </div>
       </div>
 
-      <div class="note">
-        <span>&#9679;</span><span><b>Kalshi is in BTC-only mode.</b> FLIP/MOVE/VOLUME signals on the
-        other 12 series are paused; the Bitcoin volatility index is the only thing that alerts,
-        and it reaches banner, sound, speech and email. Set <code>signals_paused: false</code>
-        to bring the rest back.</span>
-      </div>
+      {kalshi_note}
 
       <div><div class="lbl">Kalshi series</div><ul class="tks">{kser}</ul></div>
     </div>
   </div>
+
+  {btc_card}
 
   <!-- 2 ─ RH -->
   <div class="card">
