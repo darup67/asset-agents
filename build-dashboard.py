@@ -137,6 +137,26 @@ kb_last = next((r for r in reversed(kb_rows) if r.get("status") in ("call", "no_
 kb_calls_today = {r["ticker"] for r in kb_rows if r.get("status") == "call" and _et_day(r["t"]) == _today_et}
 kb_settled = [r for r in kb_rows if r.get("status") == "settled"]
 kb_won = sum(1 for r in kb_settled if r.get("won"))
+# ---------- 4c. Paper lab ----------
+# results/paper.json is rewritten by every 15-min step; backtest.json only by the
+# weekly report (or a manual run), so it carries its own age.
+PL = os.path.join(HOME, "market-lab", "paper-lab")
+pl_cfg = jload(os.path.join(PL, "config.json"))
+pl_paper = jload(os.path.join(PL, "results", "paper.json"))
+pl_bt = jload(os.path.join(PL, "results", "backtest.json"))
+def _mtime_age(path):
+    try:
+        return datetime.datetime.fromtimestamp(os.path.getmtime(path), datetime.timezone.utc).isoformat()
+    except Exception:
+        return None
+pl_paper_age = _mtime_age(os.path.join(PL, "results", "paper.json"))
+pl_bt_age = _mtime_age(os.path.join(PL, "results", "backtest.json"))
+PL_STRATS = ("hold", "trend", "breakout", "reversion")
+
+def _passes(rows, s):
+    r, h = rows.get(s) or {}, rows.get("hold") or {}
+    return bool(r.get("bars")) and r["net"] > max(0, h.get("net", 0)) and r["first_half"] > 0 and r["second_half"] > 0
+
 # ---------- 5. Robinhood (from connector) ----------
 RH = json.loads(os.environ["RH_DATA"])
 
@@ -279,6 +299,65 @@ def chip(txt, kind):
     return f'<span class="chip {kind}">{e(txt)}</span>'
 
 btc_card = _btc_card()
+
+def _paper_card():
+    if not pl_cfg:
+        return ""
+    ag = agent("com.dhruv.paperlab")
+    fresh = pl_paper_age and (now.timestamp() - datetime.datetime.fromisoformat(pl_paper_age).timestamp()) < 3600
+    passes = [f"{i} {s}" for i, rows in pl_bt.items() for s in PL_STRATS[1:] if _passes(rows, s)]
+    first = next((r for rows in pl_paper.values() for r in rows.values() if r.get("bars")), None)
+    live_days = first["days"] if first else 0
+    live = [(i, s, r["net"]) for i, rows in pl_paper.items() for s, r in rows.items()
+            if s in PL_STRATS[1:] and r.get("bars")]
+    best = max(live, key=lambda x: x[2]) if live else None
+    killed = sum(1 for rows in pl_paper.values() for s, r in rows.items() if r.get("killed"))
+
+    def cell(i, s):
+        r = (pl_paper.get(i) or {}).get(s) or {}
+        if not r.get("bars"):
+            return '<td class="num" style="color:var(--faint)">--</td>'
+        mark = " &#10003;" if _passes(pl_bt.get(i) or {}, s) else ""
+        cls = "pos" if r["net"] > 0 else ("neg" if r["net"] < 0 else "")
+        kill = ' <span style="color:var(--neg);font-size:10px">killed</span>' if r.get("killed") else ""
+        return f'<td class="num {cls}">{signed(r["net"])}{mark}{kill}</td>'
+    rows = "".join(f'<tr><td class="sym">{e(i)}</td>' + "".join(cell(i, s) for s in PL_STRATS) + "</tr>"
+                   for i in (pl_cfg.get("instruments") or {}))
+    return f"""<!-- 1c ─ Paper lab -->
+  <div class="card">
+    <div class="stripe {'ok' if ag['loaded'] and fresh else 'bad'}"></div>
+    <div class="head">
+      <h2>Paper lab</h2>
+      {chip(age(pl_paper_age) if pl_paper_age else 'no results yet', 'ok' if fresh else 'bad')}
+      {chip('simulated only', 'acc')}
+      {chip(f"rules v{pl_cfg.get('rules_version', '?')}", 'acc')}
+      <span class="sid">~/market-lab/paper-lab</span>
+    </div>
+    <div class="body">
+      <div class="kv">
+        <div><span class="k">Paper since</span><span class="v">{e(pl_cfg.get('paper_start', '')[:10])}</span></div>
+        <div><span class="k">Days live</span><span class="v">{live_days}</span></div>
+        <div><span class="k">Best live</span><span class="v" style="font-size:12.5px">{e(f"{best[0]} {best[1]} {signed(best[2])}") if best else "--"}</span></div>
+        <div><span class="k">Books killed</span><span class="v">{killed}</span></div>
+        <div><span class="k">Backtest passes</span><span class="v" style="font-size:12.5px">{e(", ".join(passes)) or "none"}</span></div>
+      </div>
+      <div>
+        <div class="lbl">Live paper P&amp;L after costs &#183; per $10k sleeve &#183; &#10003; = passed the backtest</div>
+        <div class="tblwrap">
+          <table>
+            <thead><tr><th>Inst</th>{''.join(f"<th>{s}</th>" for s in PL_STRATS)}</tr></thead>
+            <tbody>{rows}</tbody>
+          </table>
+        </div>
+      </div>
+      <div class="note"><span>&#8505;</span><span>Fixed rules, simulated fills at the next bar's open with
+      estimated fees and slippage. <b>No broker connection.</b> A rule only counts if it beats holding in the
+      backtest <i>and</i> keeps doing it here for weeks. Backtest figures {e(age(pl_bt_age)) if pl_bt_age else 'not run yet'};
+      the weekly email (Sun 6 pm) has the full report.</span></div>
+    </div>
+  </div>"""
+
+paper_card = _paper_card()
 
 flip_ok   = ag_flip["loaded"] and fs.get("failures", 0) == 0
 kalshi_ok = ag_kalshi["loaded"] and ks.get("failures", 0) == 0
@@ -526,6 +605,8 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
   </div>
 
   {btc_card}
+
+  {paper_card}
 
   <!-- 2 ─ RH -->
   <div class="card">

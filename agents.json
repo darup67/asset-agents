@@ -45,6 +45,16 @@
       "label": "com.dhruv.kalshibtc.recal",
       "what": "BTC caller recalibration",
       "every": "Sundays 6am"
+    },
+    {
+      "label": "com.dhruv.paperlab",
+      "what": "Paper lab step",
+      "every": "15m"
+    },
+    {
+      "label": "com.dhruv.paperlab.report",
+      "what": "Paper lab weekly email",
+      "every": "Sundays 6pm"
     }
   ],
   "claude_tasks": [
