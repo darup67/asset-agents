@@ -7,7 +7,7 @@ Local watcher state (flip, Kalshi, Zillow) is read live from disk. Robinhood
 figures arrive via RH_DATA because they come from an MCP connector a script
 cannot call; refresh those by re-running with a new blob.
 """
-import json, os, datetime, html, subprocess
+import json, os, re, datetime, html, subprocess
 
 HOME = os.path.expanduser("~")
 FN   = os.path.join(HOME, "flip-notifier")
@@ -359,6 +359,91 @@ def _paper_card():
 
 paper_card = _paper_card()
 
+# ---------- Event desk: one row per scheduled email ----------
+ED = os.path.join(HOME, "market-lab", "event-desk")
+IV = os.path.join(HOME, "market-iv-agent")
+
+def _sent_log():
+    out = {}
+    try:
+        with open(os.path.join(ED, "data", "sent.jsonl")) as f:
+            for line in f:
+                if line.strip():
+                    r = json.loads(line)
+                    out[r["email"]] = r          # last attempt per email wins
+    except Exception:
+        pass
+    return out
+
+def _handoff(path):
+    h = jload(os.path.join(path, "handoff", "handoff.json"))
+    if not h:
+        return None
+    act = [t["ticker"] for t in h.get("tickets", []) if t.get("act")]
+    return {"date": h.get("date"), "run": h.get("run"), "act": act}
+
+def _desk_card():
+    sent = _sent_log()
+    rows = [("watchlist", "\U0001f4cb Watchlist", "daily 8:50", None),
+            ("biopharma", "\U0001f9ec Bio/pharma", "wkdy 10:05", os.path.join(IV, "data"))]
+    for f in sorted(os.listdir(os.path.join(IV, "profiles")) if os.path.isdir(os.path.join(IV, "profiles")) else []):
+        if f.endswith(".json"):
+            prof = jload(os.path.join(IV, "profiles", f))
+            key = f[:-5]
+            rows.append((key, f'{prof.get("emoji", "")} {re.sub(r" IV$", "", prof.get("title", key))}', "wkdy 10:10",
+                         os.path.join(IV, "data", "sectors", key)))
+    today = now.date().isoformat()
+    trs = []
+    fresh_scans = 0
+    for key, label, when, ivdir in rows:
+        h = _handoff(ivdir) if ivdir else None
+        if ivdir:
+            if h and h["date"] == today:
+                fresh_scans += 1
+            scan = (f'{e(h["date"][5:])} · {("ACT " + "+".join(h["act"])) if h["act"] else "no spread passes"}'
+                    if h else '<span style="color:var(--faint)">no scan yet</span>')
+        else:
+            scan = '<span style="color:var(--faint)">n/a</span>'
+        r = sent.get(key)
+        if r:
+            ts = datetime.datetime.fromtimestamp(r["t"]).astimezone()
+            last = (f'{"&#10003;" if r["ok"] else "&#10007; failed"} {e(ts.strftime("%a %-I:%M %p"))}'
+                    + (' <span class="chip warn" style="font-size:9.5px;padding:1px 5px">test</span>' if r.get("test") else ""))
+        else:
+            last = '<span style="color:var(--faint)">not sent yet</span>'
+        trs.append(f'<tr><td class="sym" style="font-family:inherit;font-weight:600">{e(label)}</td>'
+                   f'<td class="num" style="font-size:11.5px">{e(when)}</td>'
+                   f'<td class="num" style="font-size:11.5px;text-align:left;padding-left:14px">{scan}</td>'
+                   f'<td class="num" style="font-size:11.5px">{last}</td></tr>')
+    loaded = all(agent(l)["loaded"] for l in ("com.dhruv.eventdesk.watchlist", "com.dhruv.eventdesk.bio",
+                                              "com.dhruv.eventdesk.sectors", "com.dhruv.sectoriv.open"))
+    n_iv = len(rows) - 1
+    return f"""<!-- 1d ─ Event desk emails -->
+  <div class="card">
+    <div class="stripe {'ok' if loaded else 'bad'}"></div>
+    <div class="head">
+      <h2>Event desk emails</h2>
+      {chip(f"{len(rows)} emails", 'acc')}
+      {chip(f"{fresh_scans}/{n_iv} scans today", 'ok' if fresh_scans == n_iv else 'warn')}
+      {chip('jobs loaded' if loaded else 'job NOT loaded', 'ok' if loaded else 'bad')}
+      <span class="sid">~/market-lab/event-desk</span>
+    </div>
+    <div class="body">
+      <div class="tblwrap">
+        <table>
+          <thead><tr><th>Email</th><th>When</th><th style="text-align:left;padding-left:14px">Today's IV scan</th><th>Last sent</th></tr></thead>
+          <tbody>{''.join(trs)}</tbody>
+        </table>
+      </div>
+      <div class="note"><span>&#8505;</span><span>One email per S&amp;P sector (S&amp;P 500 + Nasdaq-100 + Dow),
+      plus health care and the TradingView watchlist. Sector and health-care emails lead with 2&#8211;5 act-on
+      bull call spreads ($10k per sector), then the top 10 by event impact. Scans run 9:45 (health care) and
+      9:53 (sectors) on weekdays. Jev reads headlines once a TypeSafe key exists. Read-only: orders are entered by hand.</span></div>
+    </div>
+  </div>"""
+
+desk_card = _desk_card()
+
 flip_ok   = ag_flip["loaded"] and fs.get("failures", 0) == 0
 kalshi_ok = ag_kalshi["loaded"] and ks.get("failures", 0) == 0
 zill_ok   = ag_zillow["loaded"]
@@ -607,6 +692,8 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
   {btc_card}
 
   {paper_card}
+
+  {desk_card}
 
   <!-- 2 ─ RH -->
   <div class="card">
