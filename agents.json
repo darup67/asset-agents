@@ -85,6 +85,11 @@
       "label": "com.dhruv.eventdesk.sectors",
       "what": "Sector emails (10)",
       "every": "wkdy 10:10am"
+    },
+    {
+      "label": "com.dhruv.watchdog",
+      "what": "Watchdog (emails, scans, flip, zillow)",
+      "every": "15m"
     }
   ],
   "claude_tasks": [
