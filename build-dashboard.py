@@ -418,6 +418,21 @@ def _desk_card():
     loaded = all(agent(l)["loaded"] for l in ("com.dhruv.eventdesk.watchlist", "com.dhruv.eventdesk.bio",
                                               "com.dhruv.eventdesk.sectors", "com.dhruv.sectoriv.open"))
     n_iv = len(rows) - 1
+    wd = jload(os.path.join(HOME, "market-lab", "ops", "data", "status.json"))
+    wd_age = (now - datetime.datetime.fromisoformat(wd["at"]).astimezone()).total_seconds() / 60 if wd.get("at") else None
+    wd_bad = [c for c in wd.get("checks", []) if c["level"] != "ok"]
+    if wd_age is None:
+        wd_line = '<div class="note bad"><span>&#9679;</span><span><b>Watchdog has never run.</b></span></div>'
+    elif wd_age > 40:
+        wd_line = (f'<div class="note bad"><span>&#9679;</span><span><b>Watchdog silent for {wd_age:.0f} min</b> '
+                   f'(runs every 15). Check <code>launchctl list | grep watchdog</code>.</span></div>')
+    elif wd_bad:
+        wd_line = ('<div class="note"><span>&#9679;</span><span><b>Watchdog:</b> '
+                   + e("; ".join(f"{c['check']}: {c['msg']}" for c in wd_bad)) + '</span></div>')
+    else:
+        wd_line = (f'<div style="font-size:12px;color:var(--muted)">Watchdog: all {len(wd.get("checks", []))} checks ok, '
+                   f'{wd_age:.0f} min ago. It re-runs missed scans and emails, retries refused sends, and '
+                   f'health-checks the flip notifier every 15 min.</div>')
     return f"""<!-- 1d ─ Event desk emails -->
   <div class="card">
     <div class="stripe {'ok' if loaded else 'bad'}"></div>
@@ -435,6 +450,7 @@ def _desk_card():
           <tbody>{''.join(trs)}</tbody>
         </table>
       </div>
+      {wd_line}
       <div class="note"><span>&#8505;</span><span>One email per S&amp;P sector (S&amp;P 500 + Nasdaq-100 + Dow),
       plus health care and the TradingView watchlist. Sector and health-care emails lead with 2&#8211;5 act-on
       bull call spreads ($10k per sector), then the top 10 by event impact. Scans run 9:45 (health care) and
