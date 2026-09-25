@@ -55,6 +55,36 @@
       "label": "com.dhruv.paperlab.report",
       "what": "Paper lab weekly email",
       "every": "Sundays 6pm"
+    },
+    {
+      "label": "com.dhruv.healthiv.open",
+      "what": "Health care IV scan",
+      "every": "wkdy 9:45am"
+    },
+    {
+      "label": "com.dhruv.healthiv",
+      "what": "Health care IV close run",
+      "every": "wkdy 4:30pm"
+    },
+    {
+      "label": "com.dhruv.sectoriv.open",
+      "what": "Sector IV scans (10)",
+      "every": "wkdy 9:53am"
+    },
+    {
+      "label": "com.dhruv.eventdesk.watchlist",
+      "what": "Watchlist email",
+      "every": "daily 8:50am"
+    },
+    {
+      "label": "com.dhruv.eventdesk.bio",
+      "what": "Bio/pharma email",
+      "every": "wkdy 10:05am"
+    },
+    {
+      "label": "com.dhruv.eventdesk.sectors",
+      "what": "Sector emails (10)",
+      "every": "wkdy 10:10am"
     }
   ],
   "claude_tasks": [
