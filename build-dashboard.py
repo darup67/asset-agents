@@ -39,7 +39,48 @@ def count(path, needle):
     except Exception: return 0
 
 # ---------- 1. Flip watcher ----------
-fs   = jload(os.path.join(FN, "state.json"))
+# While CHART_WATCHER_PAUSED exists the chart notifier's state.json and log are
+# frozen; the headless watcher (headless-flip.js) is the live source instead.
+HEADLESS = os.path.exists(os.path.join(FN, "CHART_WATCHER_PAUSED"))
+HEADLESS_STALE_S = 40 * 60   # runs at :01 :03 :31 :33, so the widest gap is 28m
+
+def _secs_since(iso):
+    try:
+        t = datetime.datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+        return (datetime.datetime.now(datetime.timezone.utc) - t).total_seconds()
+    except Exception: return None
+
+def flips_24h_tsv(path):
+    n = 0
+    try:
+        with open(path, errors="ignore") as f:
+            for l in f:
+                s = _secs_since(l.split("\t", 1)[0].strip())
+                if s is not None and s <= 86400: n += 1
+    except Exception: pass
+    return n
+
+def last_line(path):
+    try:
+        with open(path, errors="ignore") as f:
+            lines = [l.rstrip("\n") for l in f if l.strip()]
+        return lines[-1] if lines else ""
+    except Exception: return ""
+
+if HEADLESS:
+    fs   = jload(os.path.join(FN, "headless-state.json"))
+    flips24 = flips_24h_tsv(os.path.join(FN, "headless-alerts.tsv"))
+    # Log lines are "<ISO>  no flips · 25/25 ok · mode live".
+    _hl  = last_line(os.path.join(FN, "headless-flip.log"))
+    _ts, _, hl_msg = _hl.partition("  ")
+    hl_msg   = hl_msg.strip()
+    hl_age   = _secs_since(_ts)
+    hl_stale = hl_age is None or hl_age > HEADLESS_STALE_S
+    _m = re.search(r"(\d+)/(\d+) ok", hl_msg)
+    hl_allok = bool(_m) and _m.group(1) == _m.group(2)
+else:
+    fs   = jload(os.path.join(FN, "state.json"))
+    flips24 = count(os.path.join(FN, 'flip-notifier.log'), 'NOTIFIED')
 reg  = fs.get("regimes", {})
 buys  = sorted(k.split(":")[-1] for k, v in reg.items() if v == "BUY")
 sells = sorted(k.split(":")[-1] for k, v in reg.items() if v != "BUY")
@@ -102,7 +143,7 @@ def agent(name):
             return {"loaded": True, "running": p[0] != "-", "exit": p[1]}
     return {"loaded": False, "running": False, "exit": "-"}
 
-ag_flip   = agent("com.dhruv.flipnotifier")
+ag_flip   = agent("com.dhruv.headlessflip" if HEADLESS else "com.dhruv.flipnotifier")
 ag_awake  = agent("com.dhruv.flipnotifier.awake")
 ag_kalshi = agent("com.dhruv.kalshiwatcher")
 ag_zillow = agent("com.dhruv.zillowagent")
@@ -110,6 +151,11 @@ ag_zillow = agent("com.dhruv.zillowagent")
 def agent_rows():
     out = []
     for a in agents_cfg.get("launchd", []):
+        if a["label"] == "com.dhruv.flipnotifier" and HEADLESS:
+            out.append((a["what"], a["every"], "acc", "paused"))
+            continue
+        if a["label"] == "com.dhruv.headlessflip" and not HEADLESS:
+            continue
         st = agent(a["label"])
         out.append((a["what"], a["every"], "ok" if st["loaded"] and st["exit"] == "0"
                     else ("bad" if not st["loaded"] else "warn"),
@@ -460,7 +506,18 @@ def _desk_card():
 
 desk_card = _desk_card()
 
-flip_ok   = ag_flip["loaded"] and fs.get("failures", 0) == 0
+flip_ok   = (ag_flip["loaded"] and not hl_stale and hl_allok) if HEADLESS \
+            else (ag_flip["loaded"] and fs.get("failures", 0) == 0)
+
+if not HEADLESS:
+    flip_note = ""
+elif hl_stale:
+    flip_note = (f'<div class="note bad"><span>&#9679;</span><span><b>Headless watcher silent'
+                 f'{"" if hl_age is None else f" for {hl_age/60:.0f} min"}.</b> '
+                 f'Last log: {e(hl_msg or "none")}</span></div>')
+else:
+    flip_note = (f'<div class="note{"" if flip_ok else " bad"}"><span>&#9679;</span><span><b>Headless watcher</b> '
+                 f'&#183; {e(age(_ts))} &#183; {e(hl_msg)}. Chart notifier paused.</span></div>')
 kalshi_ok = ag_kalshi["loaded"] and ks.get("failures", 0) == 0
 zill_ok   = ag_zillow["loaded"]
 
@@ -676,9 +733,10 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
       <div class="kv">
         <div><span class="k">Symbols</span><span class="v">{len(reg)}</span></div>
         <div><span class="k">Last poll</span><span class="v">{e(age(fs.get("updated")))}</span></div>
-        <div><span class="k">Flips 24h</span><span class="v">{count(os.path.join(FN,'flip-notifier.log'),'NOTIFIED')}</span></div>
+        <div><span class="k">Flips 24h</span><span class="v">{flips24}</span></div>
         <div><span class="k">BTC 15m vol</span><span class="v {vol_kind}">{(f"{vol_index:.0f}c " + vol_band) if vol_index is not None else "--"}</span></div>
       </div>
+      {flip_note}
 
       <div>
         <div class="lbl">Regime · {len(buys)} buy / {len(sells)} sell</div>
