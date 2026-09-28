@@ -521,8 +521,8 @@ elif hl_stale:
                  f'Last log: {e(hl_msg or "none")}</span></div>')
 else:
     flip_note = (f'<div class="note{"" if flip_ok else " bad"}"><span>&#9679;</span><span><b>Headless watcher</b> '
-                 f'&#183; {e(age(_ts))} &#183; {e(hl_msg)}. Chart notifier paused.</span></div>')
-kalshi_ok = ag_kalshi["loaded"] and ks.get("failures", 0) == 0
+                 f'&#183; {e(age(_ts))} &#183; {e(hl_msg)}. Chart notifier retired.</span></div>')
+kalshi_ok = True   # Kalshi watcher retired 2026-09-28 (its card shows the last snapshot)
 zill_ok   = ag_zillow["loaded"]
 
 rows_buy  = "".join(f'<li class="tk pos">{e(s)}</li>' for s in buys)
