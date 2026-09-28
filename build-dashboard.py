@@ -32,12 +32,6 @@ def age(iso):
     if s < 172800: return f"{s/3600:.1f}h ago"
     return f"{int(s//86400)}d ago"
 
-def count(path, needle):
-    try:
-        with open(path, errors="ignore") as f:
-            return sum(1 for l in f if needle in l)
-    except Exception: return 0
-
 # ---------- 1. Flip watcher ----------
 # While CHART_WATCHER_PAUSED exists the chart notifier's state.json and log are
 # frozen; the headless watcher (headless-flip.js) is the live source instead.
@@ -80,7 +74,15 @@ if HEADLESS:
     hl_allok = bool(_m) and _m.group(1) == _m.group(2)
 else:
     fs   = jload(os.path.join(FN, "state.json"))
-    flips24 = count(os.path.join(FN, 'flip-notifier.log'), 'NOTIFIED')
+    # Log lines are "<ISO>  NOTIFIED: …"; count only the last 24h, not the whole log.
+    flips24 = 0
+    try:
+        with open(os.path.join(FN, "flip-notifier.log"), errors="ignore") as f:
+            for l in f:
+                if "NOTIFIED" not in l: continue
+                s = _secs_since(l.split(None, 1)[0] if l.strip() else "")
+                if s is not None and s <= 86400: flips24 += 1
+    except Exception: pass
 reg  = fs.get("regimes", {})
 buys  = sorted(k.split(":")[-1] for k, v in reg.items() if v == "BUY")
 sells = sorted(k.split(":")[-1] for k, v in reg.items() if v != "BUY")
@@ -137,9 +139,11 @@ try:
 except Exception:
     ll = ""
 def agent(name):
+    # Exact label match: a substring test let com.dhruv.flipnotifier match
+    # com.dhruv.flipnotifier.awake and report the notifier loaded when it wasn't.
     for line in ll.splitlines():
-        if name in line:
-            p = line.split()
+        p = line.split()
+        if len(p) >= 3 and p[2] == name:
             return {"loaded": True, "running": p[0] != "-", "exit": p[1]}
     return {"loaded": False, "running": False, "exit": "-"}
 
