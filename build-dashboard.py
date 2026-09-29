@@ -33,9 +33,11 @@ def age(iso):
     return f"{int(s//86400)}d ago"
 
 # ---------- 1. Flip watcher ----------
-# While CHART_WATCHER_PAUSED exists the chart notifier's state.json and log are
-# frozen; the headless watcher (headless-flip.js) is the live source instead.
-HEADLESS = os.path.exists(os.path.join(FN, "CHART_WATCHER_PAUSED"))
+# The chart notifier was paused (CHART_WATCHER_PAUSED) and then retired on
+# 2026-09-28, which deleted the marker; its state.json and log are frozen. Use the
+# headless watcher (headless-flip.js) whenever its state file exists.
+HEADLESS = (os.path.exists(os.path.join(FN, "CHART_WATCHER_PAUSED"))
+            or os.path.exists(os.path.join(FN, "headless-state.json")))
 HEADLESS_STALE_S = 40 * 60   # runs at :01 :03 :31 :33, so the widest gap is 28m
 
 def _secs_since(iso):
