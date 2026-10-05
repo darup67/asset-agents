@@ -1,5 +1,5 @@
 {
-  "_comment": "Scheduled work across the stack. launchd agents are verified live against launchctl; Claude scheduled tasks cannot be \u2014 their cron lives in the app, not on disk \u2014 so their schedule is recorded here and the generator flags any task directory it does not recognise.",
+  "_comment": "Scheduled work across the stack. launchd agents are verified live against launchctl; scheduled agent tasks cannot be \u2014 their cron lives in the app, not on disk \u2014 so their schedule is recorded here and the generator flags any task directory it does not recognise.",
   "launchd": [
     {
       "label": "com.dhruv.flipnotifier",
@@ -97,7 +97,7 @@
       "every": "15m"
     }
   ],
-  "claude_tasks": [
+  "agent_tasks": [
     {
       "id": "flip-watchlist-sync",
       "what": "Sync Scanner to watchlist",

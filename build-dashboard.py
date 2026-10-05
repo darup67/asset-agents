@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Build the Asset Agents dashboard — a point-in-time snapshot of the four pinned
-Claude Code sessions, published as an Artifact so it is readable from a phone.
+agent sessions, published as an Artifact so it is readable from a phone.
 
 Local watcher state (flip, Kalshi, Zillow) is read live from disk. Robinhood
 figures arrive via RH_DATA because they come from an MCP connector a script
@@ -12,7 +12,8 @@ import json, os, re, datetime, html, subprocess
 HOME = os.path.expanduser("~")
 FN   = os.path.join(HOME, "flip-notifier")
 ZA   = os.path.join(HOME, "zillow-agent")
-OUT  = "/tmp/claude-501/-Users-dhruvpatel/055dec91-ccbf-4692-a13d-b5fbbfb021ef/scratchpad/asset-agents.html"
+OUT  = "/tmp/asset-agents/asset-agents.html"
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
 
 now = datetime.datetime.now().astimezone()
 
@@ -119,13 +120,13 @@ zmk = [m for m in zmk if isinstance(m, dict)]
 zzips = sum(len(m.get("zips", [])) for m in zmk)
 
 # ---------- 3b. scheduled work ----------
-# launchd agents are verified live. Claude scheduled tasks cannot be — their
+# launchd agents are verified live. scheduled agent tasks cannot be — their
 # cron is held by the app, not on disk — so the config carries their schedule
 # and we cross-check the task directories to surface anything unrecorded.
 AGENTS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agents.json")
 agents_cfg = jload(AGENTS_FILE, {})
 TASK_DIR = os.path.join(HOME, ".claude", "scheduled-tasks")
-known_tasks = ({t["id"] for t in agents_cfg.get("claude_tasks", [])}
+known_tasks = ({t["id"] for t in agents_cfg.get("agent_tasks", [])}
                | set(agents_cfg.get("retired", [])))
 on_disk = set()
 try:
@@ -166,7 +167,7 @@ def agent_rows():
         out.append((a["what"], a["every"], "ok" if st["loaded"] and st["exit"] == "0"
                     else ("bad" if not st["loaded"] else "warn"),
                     "loaded" if st["loaded"] else "NOT LOADED"))
-    for t in agents_cfg.get("claude_tasks", []):
+    for t in agents_cfg.get("agent_tasks", []):
         present = t["id"] in on_disk
         out.append((t["what"], t["every"], "acc" if present else "bad",
                     "scheduled task" if present else "MISSING"))
@@ -706,7 +707,7 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
     <h1>Asset Agents</h1>
     <span class="stamp">SNAPSHOT · {e(STAMP)}</span>
   </div>
-  <p class="lede">The four pinned Claude Code sessions on this Mac. Figures are read
+  <p class="lede">The four pinned agent sessions on this Mac. Figures are read
   from local state at build time — this page does not poll, so treat the stamp above
   as the age of everything below.</p>
 
@@ -890,8 +891,8 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
     <div class="head">
       <h2>Scheduled work</h2>
       {chip(f"{len(agents_cfg.get('launchd', []))} agents", 'acc')}
-      {chip(f"{len(agents_cfg.get('claude_tasks', []))} tasks", 'acc')}
-      <span class="sid">launchd + claude</span>
+      {chip(f"{len(agents_cfg.get('agent_tasks', []))} tasks", 'acc')}
+      <span class="sid">launchd + agents</span>
     </div>
     <div class="body">
       <div class="agrid">
@@ -907,7 +908,7 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
        + '. They run but are not described in <code>agents.json</code>, so this card cannot say what they do.</span></div>'}
       <div class="note">
         <span>&#8505;</span><span>launchd agents are checked live against
-        <code>launchctl</code>. Claude task schedules live in the app rather than on disk,
+        <code>launchctl</code>. agent task schedules live in the app rather than on disk,
         so they are recorded in <code>agents.json</code> &#8212; the card cross-checks the task
         directory and flags anything it does not recognise rather than quietly omitting it.</span>
       </div>

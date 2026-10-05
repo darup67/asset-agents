@@ -1,6 +1,6 @@
 # Asset Agents Dashboard
 
-The cross-agent layer over four pinned Claude Code sessions on this Mac. Each
+The cross-agent layer over four pinned agent sessions on this Mac. Each
 agent owns its own repo and runs independently; this one only *observes* them
 and publishes a single page you can read from a phone.
 
@@ -8,14 +8,14 @@ and publishes a single page you can read from a phone.
   Flip Watcher v1  ──┐
   RH (Robinhood)   ──┤
   Zillow scanner   ──┼──►  build-dashboard.py  ──►  Artifact  ──►  phone
-  TradingView      ──┘         (reads state)        (claude.ai)
+  TradingView      ──┘         (reads state)        (the artifact host)
 ```
 
 ## Why this exists
 
-Claude Code sessions on this machine are **local** — `isRemote: false`, transcripts
-in `~/.claude/projects/`. They have no server-side copy, so they can never appear
-in the Claude mobile app's conversation list, and a sidebar pin is desktop UI
+Agent sessions on this machine are **local** — `isRemote: false`, transcripts
+in the agent's local project folder. They have no server-side copy, so they can never appear
+in the mobile app's conversation list, and a sidebar pin is desktop UI
 state that does not travel. An Artifact is the only thing that actually reaches a
 phone, so the dashboard is the sync mechanism.
 
@@ -49,7 +49,7 @@ URL so the link never changes.
 dashboard contains account value, positions and P&L — the generator is the
 artifact worth versioning, not its output.
 
-**The page is a snapshot, not a feed.** An Artifact runs on claude.ai and cannot
+**The page is a snapshot, not a feed.** An Artifact runs on the artifact host and cannot
 reach localhost on this Mac, so it cannot poll. The build stamp is printed
 prominently for that reason: it is the age of every figure on the page.
 
@@ -141,13 +141,13 @@ unlabelled table is the kind of quiet aggregation that misleads later.
 ## Scheduled work card
 
 A fifth card lists every scheduled thing in the stack — seven launchd agents and
-four Claude tasks, including `portfolio-weekly-review`.
+four agent tasks, including `portfolio-weekly-review`.
 
 The two halves are verified differently, and the card says so rather than
 implying equal confidence:
 
 - **launchd agents** are checked live against `launchctl` — loaded or not.
-- **Claude task schedules live in the app, not on disk**, so they are recorded in
+- **Agent task schedules live in the app, not on disk**, so they are recorded in
   `agents.json`. The card cross-checks the task directory and flags anything it
   does not recognise, so a task added later shows up instead of silently missing.
 
