@@ -12,7 +12,7 @@ import json, os, re, datetime, html, subprocess
 HOME = os.path.expanduser("~")
 FN   = os.path.join(HOME, "flip-notifier")
 ZA   = os.path.join(HOME, "zillow-agent")
-OUT  = "/tmp/asset-agents/asset-agents.html"
+OUT  = os.environ.get("ASSET_OUT", "/tmp/asset-agents/asset-agents.html")        # Jev HQ builds its own copy via ASSET_OUT
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 
 now = datetime.datetime.now().astimezone()
@@ -211,7 +211,9 @@ def _passes(rows, s):
     return bool(r.get("bars")) and r["net"] > max(0, h.get("net", 0)) and r["first_half"] > 0 and r["second_half"] > 0
 
 # ---------- 5. Robinhood (from connector) ----------
-RH = json.loads(os.environ["RH_DATA"])
+# Jev HQ builds this page WITHOUT Robinhood (a script cannot call the MCP connector, and HQ is served to the phone): ASSET_NO_RH=1 uses an empty placeholder and swaps the RH card for a note.
+NO_RH = os.environ.get("ASSET_NO_RH") == "1"
+RH = ({"asof": None, "positions": [], "total": 0, "equity": 0, "crypto": 0, "cash": 0, "futures": 0} if NO_RH else json.loads(os.environ["RH_DATA"]))
 
 # Equity prices carry their own asof date; derive the label from it instead of
 # hardcoding "Friday close". On Labor Day the last print is still Friday's, and
@@ -722,8 +724,8 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
       <span class="v">{len(zs.get("listings",{})):,}</span>
       <span class="sub">{zzips} zips · {len(zmk)} markets</span></div>
     <div class="st"><span class="k">Portfolio</span>
-      <span class="v">{money(RH["total"])}</span>
-      <span class="sub">main account</span></div>
+      <span class="v">{"&#8212;" if NO_RH else money(RH["total"])}</span>
+      <span class="sub">{"not shown here" if NO_RH else "main account"}</span></div>
   </div>
 
   <!-- 1 ─ Flip Watcher v1 -->
@@ -923,6 +925,12 @@ footer code {{ font-family:"JetBrains Mono",monospace; font-size:11.5px;
 </div>
 """
 
+if NO_RH:
+    _a, _b = HTML.find("<!-- 2 "), HTML.find("<!-- 3 ")
+    if 0 <= _a < _b:
+        HTML = HTML[:_a] + ('<div class="card"><div class="stripe"></div><div class="head"><h2>Robinhood</h2><span class="chip acc">not shown in Jev HQ</span></div>'
+                            '<div class="body"><div class="note"><span>&#8505;</span><span>Account values and positions are left out of Jev HQ on purpose (it is served to your phone). '
+                            'The full console with the Robinhood panel is the published Asset Agents artifact.</span></div></div></div>\n\n  ') + HTML[_b:]
 SAFE = HTML.encode("ascii", "xmlcharrefreplace").decode("ascii")
 with open(OUT, "w", encoding="utf-8") as f:
     f.write(SAFE)
