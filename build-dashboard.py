@@ -931,6 +931,17 @@ if NO_RH:
         HTML = HTML[:_a] + ('<div class="card"><div class="stripe"></div><div class="head"><h2>Robinhood</h2><span class="chip acc">not shown in Jev HQ</span></div>'
                             '<div class="body"><div class="note"><span>&#8505;</span><span>Account values and positions are left out of Jev HQ on purpose (it is served to your phone). '
                             'The full console with the Robinhood panel is the published Asset Agents artifact.</span></div></div></div>\n\n  ') + HTML[_b:]
+# The published console is a 3-tab page (Dashboard / Ecosystem Map / Resume Section) kept in shell.html;
+# only the Dashboard pane is regenerated here. Without this splice a refresh would wipe the map and resume.
+_SHELL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shell.html")
+if not NO_RH and os.path.exists(_SHELL):
+    _w0, _w1 = HTML.find('<div class="wrap">'), HTML.rfind("</div>")
+    _sh = open(_SHELL, encoding="utf-8").read()
+    _p0 = _sh.find('<div id="pane-dashboard" class="pane active">')
+    _p1 = _sh.find("ECOSYSTEM MAP PANE")
+    _p1 = _sh.rfind("<!--", 0, _p1)
+    if _w0 >= 0 and _p0 >= 0 and _p1 > _p0:
+        HTML = _sh[:_p0] + '<div id="pane-dashboard" class="pane active">\n' + HTML[_w0:_w1 + 6] + "\n</div>\n\n" + _sh[_p1:]
 SAFE = HTML.encode("ascii", "xmlcharrefreplace").decode("ascii")
 with open(OUT, "w", encoding="utf-8") as f:
     f.write(SAFE)

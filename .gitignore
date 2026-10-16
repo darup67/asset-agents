@@ -5,3 +5,4 @@ out/
 .DS_Store
 __pycache__/
 rh-data.json
+!shell.html
